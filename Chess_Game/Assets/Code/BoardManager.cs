@@ -79,20 +79,25 @@ public class BoardManager : MonoBehaviour
         {
             var n = b;
             row = 0;
+            bool isRight = true;
             _currentSpawnPos = StartPos;
+            
             for (int i = 0; i < 64; i++)
             {
-                // Debug.Log(_currentSpawnPos);
+                if ((n & 1) == 1)
+                    Instantiate(ObjectsToSpawn[spawnIndex], _currentSpawnPos, Quaternion.identity);
+
                 if ((i + 1) % 8 == 0)
                 {
                     row++;
+                    isRight = row % 2 == 0;
                     Debug.Log("ROW HIGHER");
                     _currentSpawnPos += Vector3.forward;
-                };
-                if ((n & 1) == 1)
-                    Instantiate(ObjectsToSpawn[spawnIndex], _currentSpawnPos, Quaternion.identity);
+                }
+                else
+                    _currentSpawnPos += isRight ? Vector3.right : Vector3.left;
+                
                 n >>= 1;
-                _currentSpawnPos += row % 2 == 0 ? Vector3.right : Vector3.left;
             }
 
             spawnIndex++;
