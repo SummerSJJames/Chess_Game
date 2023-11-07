@@ -30,14 +30,11 @@ public class BoardCreator : MonoBehaviour
 
                 quad.transform.position = new Vector3(i, 0, j);
                 boardTiles[i, j] = quad.transform;
-                Instantiate(quad, quad.transform.position, quad.transform.rotation);
+                var tile = Instantiate(quad, quad.transform.position, quad.transform.rotation);
+                tile.layer = 7;
+                tile.AddComponent<BoxCollider>();
             }
         }
-    }
-
-    private void Update()
-    {
-
     }
 }
 

@@ -24,7 +24,7 @@ public class BoardManager : MonoBehaviour
 
     List<ulong> AllPieces = new List<ulong>();
 
-    ulong board;
+    public List<Transform> Tiles = new List<Transform>();
 
     public ulong Board => WhitePawns | WhiteRooks | WhiteKnights | WhiteBishops | WhiteQueens | WhiteKing |
                           BlackPawns | BlackRooks | BlackKnights | BlackBishops | BlackQueens | BlackKing;
@@ -58,20 +58,16 @@ public class BoardManager : MonoBehaviour
         AllPieces.Add(BlackQueens);
         AllPieces.Add(BlackKing);
 
-        // foreach (var b in AllPieces)
-        // {
-        //     string num = "";
-        //     ulong n = b;
-        //     for (int i = 0; i < 64; i++)
-        //     {
-        //         if ((n & 1) == 1) num += '1';
-        //         else num += '0';
-        //         n = n >> 1;
-        //     }
-        //
-        //     Debug.Log(num);
-        // }
+        SpawnPieces();
+    }
 
+    public bool IsOccupied(int index)
+    {
+        return ((Board >> index) & 1) == 1;
+    }
+
+    void SpawnPieces()
+    {
         int spawnIndex = 0;
         int row = 0;
         _currentSpawnPos = StartPos;
