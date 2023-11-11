@@ -39,10 +39,12 @@ public class CursorManager : MonoBehaviour
 
             _selectedTile = tile.transform;
             
+            
             var index = _boardManager.Tiles.FindIndex(t => t.transform == _selectedTile.transform);
             _occupant = _boardManager.ReturnOccupant(
                 _boardManager.Tiles.FindIndex(t => t.transform == _selectedTile.transform));
             
+            Debug.Log(index);
             var newMoves = _boardManager.ShowPossibleMoves(
                 index,
                 _boardManager.ReturnOccupant(
@@ -60,7 +62,9 @@ public class CursorManager : MonoBehaviour
                         {
                             var prevIndex = _boardManager.Tiles.FindIndex(t => t.transform == previousTile.transform);
 
+                            if (_boardManager.TileInfo[index] != null) Destroy(_boardManager.TileInfo[index].gameObject);
                             _boardManager.TileInfo[index] = _boardManager.TileInfo[prevIndex];
+                            
                             _boardManager.TileInfo[prevIndex] = null;
 
                             if(_boardManager.TileInfo[index]) _boardManager.TileInfo[index].position = _selectedTile.position;
@@ -99,7 +103,7 @@ public class CursorManager : MonoBehaviour
 
             foreach (var VARIABLE in PossibleMoves)
             {
-                Debug.Log(VARIABLE);
+                //Debug.Log(VARIABLE);
                 _allMoveRepresenters.Add(Instantiate(tempRep, _boardManager.Tiles[VARIABLE].position,
                     Quaternion.identity));
             }

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using UnityEditor;
 using UnityEngine;
 
@@ -47,9 +48,9 @@ public class BoardManager : MonoBehaviour
 
     public ulong Board => WhitePawns | WhiteRooks | WhiteKnights | WhiteBishops | WhiteQueens | WhiteKing |
                           BlackPawns | BlackRooks | BlackKnights | BlackBishops | BlackQueens | BlackKing;
-    
+
     public Dictionary<PieceType, (ulong, int)> BitBoards = new Dictionary<PieceType, (ulong, int)>();
-    public Dictionary<int, Transform> TileInfo = new Dictionary<int, Transform>(); 
+    public Dictionary<int, Transform> TileInfo = new Dictionary<int, Transform>();
 
     private PieceType[] pieceOccupancy = new PieceType[64];
 
@@ -68,20 +69,22 @@ public class BoardManager : MonoBehaviour
         BlackBishops = 0x2400000000000000;
         BlackQueens = 0x0800000000000000;
         BlackKing = 0x1000000000000000;
-        
+
         BitBoards.Add(PieceType.WPawn, (WhitePawns, 0));
         BitBoards.Add(PieceType.WRook, (WhiteRooks, 0));
         BitBoards.Add(PieceType.WKnight, (WhiteKnights, 0));
-        BitBoards.Add(PieceType.WBishop, (WhiteBishops,0));
+        BitBoards.Add(PieceType.WBishop, (WhiteBishops, 0));
         BitBoards.Add(PieceType.WQueen, (WhiteQueens, 0));
         BitBoards.Add(PieceType.WKing, (WhiteKing, 0));
-        
+
         BitBoards.Add(PieceType.BPawn, (BlackPawns, 1));
         BitBoards.Add(PieceType.BRook, (BlackRooks, 1));
         BitBoards.Add(PieceType.BKnight, (BlackKnights, 1));
         BitBoards.Add(PieceType.BBishop, (BlackBishops, 1));
         BitBoards.Add(PieceType.BQueen, (BlackQueens, 1));
         BitBoards.Add(PieceType.BKing, (BlackKing, 1));
+
+        BitBoards.Add(PieceType.None, (0, -1));
 
         AllPieces.Add(WhitePawns);
         AllPieces.Add(WhiteRooks);
@@ -126,6 +129,7 @@ public class BoardManager : MonoBehaviour
 
                 if (destIndex is >= 0 and < 64)
                 {
+                    if (BitBoards[ReturnOccupant(destIndex)].Item2 == BitBoards[pt].Item2) continue;
                     int columnDiff = Math.Abs(index % 8 - destIndex % 8);
                     if (columnDiff is 1 or 2)
                         validMoves.Add(destIndex);
@@ -134,7 +138,7 @@ public class BoardManager : MonoBehaviour
         }
         else if (pt is PieceType.WPawn or PieceType.BPawn)
         {
-            int direction;// White pawns move "up" the board, black pawns move "down"
+            int direction; // White pawns move "up" the board, black pawns move "down"
             int initialMoveOffset;
 
             if (pt == PieceType.WPawn)
@@ -150,7 +154,7 @@ public class BoardManager : MonoBehaviour
 
             // Initial move
             int destIndex = index + initialMoveOffset;
-            if (!IsOccupied(destIndex))
+            if (ReturnOccupant(destIndex) == PieceType.None)
             {
                 validMoves.Add(destIndex);
 
@@ -158,39 +162,56 @@ public class BoardManager : MonoBehaviour
                 destIndex += initialMoveOffset;
                 if ((index / 8 == 1 && direction == 1) || (index / 8 == 6 && direction == -1))
                 {
-                    if (!IsOccupied(destIndex))
+                    if (ReturnOccupant(destIndex) == PieceType.None)
                         validMoves.Add(destIndex);
                 }
             }
 
             // Capture moves
             int[] captureOffsets = { 7, 9 }; // Diagonal capture offsets
-            // foreach (int offset in captureOffsets)
-            // {
-            //     destIndex = index + offset * direction;
-            //     if (destIndex >= 0 && destIndex < 64 && (index % 8 + offset % 8 <= 7))
-            //     {
-            //         if (IsOccupied(destIndex) && ReturnOccupant(destIndex) != pieceType)
-            //         {
-            //             validMoves.Add(destIndex);
-            //         }
-            //     }
-            // }
+            foreach (int offset in captureOffsets)
+            {
+                int o = direction == 1? offset : -offset;
+                destIndex = index + o * direction;
+                
+                if(ReturnOccupant(destIndex) == PieceType.None) continue;
+                if (destIndex >= 0 && destIndex < 64 && (index % 8 + o % 8 <= 7))
+                {
+                    if (BitBoards[ReturnOccupant(destIndex)].Item2 != BitBoards[pt].Item2)
+                        validMoves.Add(destIndex);
+                }
+            }
         }
         else if (pt is PieceType.WBishop or PieceType.BBishop)
         {
-            int[] bishopOffsets = { 9, 7, -9, -7};
+            int[] bishopOffsets = { 9, 7, -9, -7 };
 
             foreach (int offset in bishopOffsets)
+                validMoves.AddRange(DiagonalMoves(index, offset, pt));
+        }
+        else if (pt is PieceType.WRook or PieceType.BRook)
+        {
+            int[] rookOffsets = { 1, -1, 8, -8 };
+
+            foreach (int offset in rookOffsets)
+                validMoves.AddRange(StraightMoves(index, offset, pt));
+        }
+        else if (pt is PieceType.WQueen or PieceType.BQueen)
+        {
+            int[] straightOffsets = { 1, -1, 8, -8 };
+            int[] diagonalOffsets = { 9, 7, -9, -7 };
+
+            for (int i = 0; i < straightOffsets.Length; i++)
             {
-                validMoves.AddRange(BishopMoves(index, offset));
+                validMoves.AddRange(StraightMoves(index, straightOffsets[i], pt));
+                validMoves.AddRange(DiagonalMoves(index, diagonalOffsets[i], pt));
             }
         }
 
         return validMoves;
     }
 
-    List<int> BishopMoves(int index, int offset)
+    List<int> DiagonalMoves(int index, int offset, PieceType pt)
     {
         int destIndex = index + offset;
         List<int> validMoves = new List<int>();
@@ -198,11 +219,29 @@ public class BoardManager : MonoBehaviour
         if (destIndex is >= 0 and < 64)
         {
             int columnDiff = Math.Abs(index % 8 - destIndex % 8);
-            if (columnDiff is not 1 or 2 || IsOccupied(index))
-                    return validMoves;
+            if (columnDiff is not 1 or 2 || BitBoards[ReturnOccupant(destIndex)].Item2 == BitBoards[pt].Item2)
+                return validMoves;
             validMoves.Add(destIndex);
-            validMoves.AddRange(BishopMoves(destIndex, offset));
+            validMoves.AddRange(DiagonalMoves(destIndex, offset, pt));
         }
+
+        return validMoves;
+    }
+
+    List<int> StraightMoves(int index, int offset, PieceType pt)
+    {
+        int destIndex = index + offset;
+        List<int> validMoves = new List<int>();
+
+        if (destIndex is >= 0 and < 64)
+        {
+            if ((offset == 1 && ((index + 1) % 8 == 0)) || (offset == -1 && (index % 8 == 0))) return validMoves;
+            if (BitBoards[ReturnOccupant(destIndex)].Item2 == BitBoards[pt].Item2)
+                return validMoves;
+            validMoves.Add(destIndex);
+            validMoves.AddRange(StraightMoves(destIndex, offset, pt));
+        }
+
         return validMoves;
     }
 
@@ -256,7 +295,7 @@ public class BoardManager : MonoBehaviour
             bool isRight = true;
             _currentSpawnPos = StartPos;
             Transform piece;
-            
+
             for (int i = 0; i < 64; i++)
             {
                 if ((n & 1) == 1)
@@ -274,6 +313,7 @@ public class BoardManager : MonoBehaviour
                     if (!TileInfo.ContainsKey(i))
                         TileInfo.Add(i, null);
                 }
+
                 // if ((n & 1) == 1)
                 // {
                 //     piece = Instantiate(ObjectsToSpawn[spawnIndex], _currentSpawnPos, Quaternion.identity).transform;
@@ -294,7 +334,7 @@ public class BoardManager : MonoBehaviour
                 // else
                 //     _currentSpawnPos += isRight ? Vector3.right : Vector3.left;
                 //
-                 n >>= 1;
+                n >>= 1;
             }
 
             spawnIndex++;
